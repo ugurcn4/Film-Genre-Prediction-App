@@ -15,12 +15,12 @@ Yüksek doğruluk oranına sahip bir model ile gerçek zamanlı tahminler.
 Kolay kurulabilir ve özelleştirilebilir yapısı.
 
 # Gereksinimler
-Python 3.x
-Flask
-scikit-learn
-pandas
-joblib
-TMDb API
+1. Python 3.x
+2. Flask
+3. scikit-learn
+4. pandas
+5. joblib
+6. TMDb API
 
 # Kurulum
 1. Projeyi bilgisayarınıza klonlayın:
