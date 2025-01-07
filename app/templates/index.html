@@ -1,30 +1,55 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Film Türü Tahmin</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>Tahmin Sonuçları</title>
+     <link rel="stylesheet" href="{{ url_for('static', filename='../static/styles.css') }}">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        form {
+            margin-bottom: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin-bottom: 10px;
+        }
+
+        .results {
+            margin-top: 20px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Film Türü Tahmin Uygulaması</h1>
-    <form action="/predict" method="POST">
-        <textarea name="text" rows="5" cols="50" placeholder="Film özeti buraya gelecek..." required></textarea><br><br>
-        <input type="submit" value="Tahmin Et">
+    <h1>Film Türü Tahmin Edici</h1>
+    <form method="POST" action="/">
+        <label for="input_text">Metin Girin:</label>
+        <textarea id="input_text" name="input_text" placeholder="Film veya dizi açıklamasını buraya yazın...">{{ input_text }}</textarea>
+        <button type="submit">Tahmin Et</button>
     </form>
 
-    {% if prediction %}
-        <h3>Öngörülen Türler:</h3>
+    {% if predictions %}
+    <div class="results">
+        <h2>Tahmin Sonuçları:</h2>
         <ul>
-        {% for label in prediction %}
-            <li>{{ label }}</li>
-        {% endfor %}
+            {% set found = false %}
+            {% for genre, status in predictions.items() %}
+                {% if status == 1 %}
+                    <li>{{ genre }}</li>
+                    {% set found = true %}
+                {% endif %}
+            {% endfor %}
+            {% if not found %}
+                <!-- Bu kısmı kaldırdık çünkü 'Hiçbir tür bulunamadı.' mesajı gösterilmeyecek -->
+            {% endif %}
         </ul>
-    {% endif %}
-
-    {% if user_input %}
-        <h3>Girdiğiniz Özet:</h3>
-        <p>{{ user_input }}</p>
+    </div>
     {% endif %}
 </body>
 </html>

@@ -1,34 +1,45 @@
+import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.multioutput import MultiOutputClassifier
+from sklearn.pipeline import make_pipeline
 import joblib
-import pandas as pd
 
-# Veriyi yükleyelim
-X_train = pd.read_csv("../processed_data/X_train.csv")
-X_test = pd.read_csv("../processed_data/X_test.csv")
-y_train = pd.read_csv("../processed_data/y_train.csv")
-y_test = pd.read_csv("../processed_data/y_test.csv")
 
-# TF-IDF vektörizasyonu
-tfidf = TfidfVectorizer(max_features=5000)
-X_train_tfidf = tfidf.fit_transform(X_train["Processed_Özet"])
-X_test_tfidf = tfidf.transform(X_test["Processed_Özet"])
+def train_model(X_train, y_train, output_dir='../models'):
+    # TfidfVectorizer kullanarak metinleri sayısal verilere dönüştürme
+    tfidf = TfidfVectorizer(stop_words='english')
 
-# Modeli eğitelim (OneVsRestClassifier ile Logistic Regression)
-logreg = LogisticRegression(max_iter=1000)
-model = MultiOutputClassifier(logreg, n_jobs=-1)  # Çoklu etiketli sınıflandırma
-model.fit(X_train_tfidf, y_train)
+    # Modeli oluşturma ve eğitme
+    models = {}
+    for column in y_train.columns:
+        print(f"Model eğitiliyor: {column}")
 
-# Modeli kaydedelim
-joblib.dump(model, '../models/model.pkl')
+        # Logistic Regression modeli ile eğitim
+        model = make_pipeline(tfidf, LogisticRegression(max_iter=1000))
+        model.fit(X_train, y_train[column])
 
-# TF-IDF vektörizerini kaydedelim
-joblib.dump(tfidf, '../models/tfidf_vectorizer.pkl')
+        # Modeli kaydetme
+        joblib.dump(model, f"{output_dir}/{column}_model.pkl")
+        models[column] = model
 
-# Modeli ve vektörizeri kaydettikten sonra, test seti üzerinde tahmin yapabiliriz
-y_pred = model.predict(X_test_tfidf)
+    # Model ve TFIDF vectorizer'ı kaydetme
+    joblib.dump(tfidf, f"{output_dir}/tfidf.pkl")
 
-# Modelin performansını değerlendirelim
-from sklearn.metrics import classification_report
-print(classification_report(y_test, y_pred, target_names=y_test.columns))
+    print("Modeller başarıyla eğitildi ve kaydedildi.")
+    return models, tfidf
+
+
+def load_data(input_dir='../processed_data'):
+    # Eğitim verilerini yükle
+    X_train = pd.read_csv(f"{input_dir}/X_train.csv")
+    y_train = pd.read_csv(f"{input_dir}/y_train.csv")
+
+    return X_train['Özet'], y_train
+
+
+if __name__ == "__main__":
+    # Veriyi yükle
+    X_train, y_train = load_data()
+
+    # Modeli eğit
+    models, tfidf = train_model(X_train, y_train)

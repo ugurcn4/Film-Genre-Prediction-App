@@ -1,43 +1,40 @@
 from flask import Flask, render_template, request
 import joblib
-import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
 
-# Flask uygulamasını başlatıyoruz
 app = Flask(__name__)
 
-# Model ve TF-IDF vektörizerini yükleyelim
-model = joblib.load('../models/model.pkl')
-tfidf = joblib.load('../models/tfidf_vectorizer.pkl')
+def load_model_and_predict(input_text, model_dir='../models'):
+    # Model ve TFIDF vectorizer'ı yükleme
+    tfidf = joblib.load(f"{model_dir}/tfidf.pkl")
+    models = {}
 
-# Türler listesi (modelde kullanılan türler)
-genres = ['Aile', 'Aksiyon', 'Animasyon', 'Belgesel', 'Bilim-Kurgu', 'Dram', 'Fantastik',
-          'Gerilim', 'Gizem', 'Komedi', 'Korku', 'Macera', 'Müzik', 'Romantik', 'Savaş',
-          'Suç', 'TV film', 'Tarih', 'Vahşi Batı']
+    genres = ['Aile', 'Aksiyon', 'Animasyon', 'Belgesel', 'Bilim-Kurgu', 'Dram', 'Fantastik',
+              'Gerilim', 'Gizem', 'Komedi', 'Korku', 'Macera', 'Müzik', 'Romantik', 'Savaş',
+              'Suç', 'TV film', 'Tarih', 'Vahşi Batı']
 
-# Ana sayfayı render et
-@app.route('/')
-def home():
-    return render_template('index.html')  # Bu, kullanıcıdan metin alacağımız formu barındıracak.
+    # Her bir tür için model yükleme ve tahmin yapma
+    for genre in genres:
+        model = joblib.load(f"{model_dir}/{genre}_model.pkl")
+        prediction = model.predict([input_text])
+        models[genre] = prediction[0]
 
-# Tahmin yapacak olan route
-@app.route('/predict', methods=['POST'])
-def predict():
+    return models
+
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    predictions = None
+    input_text = ""
+
     if request.method == 'POST':
-        # Kullanıcıdan gelen metni alalım
-        user_input = request.form['text']
+        # Kullanıcıdan gelen metni alın
+        input_text = request.form['input_text']
 
-        # Metni işleyelim
-        user_input_tfidf = tfidf.transform([user_input])
+        # Tahmin yap
+        predictions = load_model_and_predict(input_text)
 
-        # Tahmin yapalım
-        prediction = model.predict(user_input_tfidf)
+    return render_template('index.html', predictions=predictions, input_text=input_text)
 
-        # Tahmin edilen türleri alalım
-        predicted_labels = [genre for i, genre in enumerate(genres) if prediction[0][i] == 1]
 
-        return render_template('index.html', prediction=predicted_labels, user_input=user_input)
-
-# Uygulamayı çalıştırıyoruz
 if __name__ == "__main__":
     app.run(debug=True)

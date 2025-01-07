@@ -1,88 +1,60 @@
 import pandas as pd
-from sklearn.preprocessing import MultiLabelBinarizer
-import re
-import nltk
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MultiLabelBinarizer
+import joblib
+import os
 
-nltk.download("punkt_tab")
-nltk.download("stopwords")
 
-# Türkçe stopwords
-STOPWORDS = set(stopwords.words("turkish"))
+def preprocess_data(file_path, output_dir='../processed_data', test_size=0.15, random_state=42):
+    # Çıktı dizini oluşturuluyor
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-# Veri önişleme fonksiyonları
-def clean_text(text):
-    """
-    Metin temizleme fonksiyonu:
-    - Küçük harfe çevirir.
-    - Noktalama işaretlerini kaldırır.
-    - Türkçe stopwords (gereksiz kelimeleri) temizler.
-    """
-    text = text.lower()  # Küçük harf
-    text = re.sub(r"[^\w\s]", "", text)  # Noktalama işaretlerini kaldır
-    tokens = word_tokenize(text)  # Tokenize et
-    tokens = [word for word in tokens if word not in STOPWORDS]  # Stopwords temizle
-    return " ".join(tokens)
-
-def preprocess_data(file_path):
-    """
-    Veri setini işler:
-    - Özetleri temizler.
-    - Türleri sayısal forma çevirir.
-    - Eksik verileri (özet veya tür) içeren satırları siler.
-    """
-    # CSV dosyasını oku
+    # Veriyi yükle
     df = pd.read_csv(file_path)
+    print(f"Toplam film sayısı: {len(df)}")
 
-    # Başlangıçtaki satır sayısını kaydet
-    initial_row_count = len(df)
+    # Özet bilgisi olmayanları çıkar
+    df = df.dropna(subset=['Özet'])
+    print(f"Özet bilgisi olan film sayısı: {len(df)}")
 
-    # Tür veya özet eksik olan satırları sil
-    df = df.dropna(subset=["Özet", "Türler"])
+    # Metin temizleme
+    df['Özet'] = df['Özet'].apply(lambda x: x.lower())  # Özet metnini küçük harfe çevir
 
-    # Silinen satır sayısını hesapla
-    deleted_rows = initial_row_count - len(df)
+    # Türleri listeye dönüştür
+    df['Türler'] = df['Türler'].apply(lambda x: [genre.strip() for genre in x.split(',')])
 
-    # Özetleri temizle
-    df["Processed_Özet"] = df["Özet"].apply(clean_text)
+    # Türler için MultiLabelBinarizer kullanarak her türü bir sütun olarak ekleyelim
+    genres = ['Aile', 'Aksiyon', 'Animasyon', 'Belgesel', 'Bilim-Kurgu', 'Dram', 'Fantastik',
+              'Gerilim', 'Gizem', 'Komedi', 'Korku', 'Macera', 'Müzik', 'Romantik', 'Savaş',
+              'Suç', 'TV film', 'Tarih', 'Vahşi Batı']
 
-    # Türleri listeye çevir (MultiLabel Binarization için)
-    df["Türler_Listesi"] = df["Türler"].apply(lambda x: x.split(", "))
-
-    # Türleri binarize et
-    mlb = MultiLabelBinarizer()
-    y = mlb.fit_transform(df["Türler_Listesi"])
-
-    # X (özetler) ve y (etiketler) olarak ayır
-    X = df["Processed_Özet"]
+    mlb = MultiLabelBinarizer(classes=genres)
+    y = mlb.fit_transform(df['Türler'])
     y = pd.DataFrame(y, columns=mlb.classes_)
 
-    # Eğitim ve test setlerine ayır
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # Eğitim ve test setlerine ayırma
+    X_train, X_test, y_train, y_test = train_test_split(
+        df['Özet'],
+        y,
+        test_size=test_size,
+        random_state=random_state
+    )
 
-    # Veriyi CSV dosyasına kaydet
-    X_train.to_csv("../processed_data/X_train.csv", index=False)
-    X_test.to_csv("../processed_data/X_test.csv", index=False)
-    y_train.to_csv("../processed_data/y_train.csv", index=False)
-    y_test.to_csv("../processed_data/y_test.csv", index=False)
+    # Eğitim ve test verilerini kaydetme
+    X_train.to_csv(f"{output_dir}/X_train.csv", index=False)
+    X_test.to_csv(f"{output_dir}/X_test.csv", index=False)
+    y_train.to_csv(f"{output_dir}/y_train.csv", index=False)
+    y_test.to_csv(f"{output_dir}/y_test.csv", index=False)
 
-    return X_train, X_test, y_train, y_test, mlb.classes_, deleted_rows
+    # MultiLabelBinarizer'ı kaydetme
+    joblib.dump(mlb, f"{output_dir}/mlb.pkl")
 
-# Ana fonksiyon
+    print(f"Veri setleri {output_dir} dizinine kaydedildi.")
+    print(f"Eğitim seti boyutu: {len(X_train)}")
+    print(f"Test seti boyutu: {len(X_test)}")
+
+
 if __name__ == "__main__":
-    # Veri seti dosya yolu
-    file_path = "../data/turkce_filmler.csv"
-
-    # Veriyi işle
-    X_train, X_test, y_train, y_test, classes, deleted_rows = preprocess_data(file_path)
-
-    # Örnek çıktı
-    print("Eğitim veri sayısı:", len(X_train))
-    print("Test veri sayısı:", len(X_test))
-    print("Türler:", classes)
-    print("İşlenmiş bir örnek metin:", X_train.iloc[0])
-
-    # Silinen satır sayısı
-    print(f"Silinen satır sayısı: {deleted_rows}")
+    file_path = "../data/turkce_filmler_esit_tur.csv"  # CSV dosyanızın yolu
+    preprocess_data(file_path)
